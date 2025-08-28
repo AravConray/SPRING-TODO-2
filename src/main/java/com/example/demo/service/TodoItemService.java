@@ -1,48 +1,56 @@
-package com.example.demo.service;
-import com.example.demo.model.TodoItem;
-import com.example.demo.repository.TodoItemRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import java.util.List;
-import java.util.Optional;
+class TodoItemService {
+  constructor(todoItemRepository) {
+    this.todoItemRepository = todoItemRepository;
+  }
 
-@Service
-@Transactional
-public class TodoItemService {
+  async getAll() {
+    return await this.todoItemRepository.findAll();
+  }
 
-    private final TodoItemRepository todoItemRepository;
-
-    public TodoItemService(TodoItemRepository todoItemRepository) {
-        this.todoItemRepository = todoItemRepository;
+  async getById(id) {
+    const item = await this.todoItemRepository.findById(id);
+    if (!item) {
+      const error = new Error(`Todo item with id ${id} not found`);
+      error.status = 404;
+      throw error;
     }
+    return item;
+  }
 
-    public List<TodoItem> findAll() {
-        return todoItemRepository.findAll();
+  async create(data) {
+    // Basic validation
+    if (!data.title) {
+      const error = new Error('Title is required');
+      error.status = 400;
+      throw error;
     }
+    const newItem = {
+      title: data.title,
+      description: data.description || '',
+      completed: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    return await this.todoItemRepository.save(newItem);
+  }
 
-    public Optional<TodoItem> findById(Long id) {
-        return todoItemRepository.findById(id);
-    }
+  async update(id, data) {
+    const existing = await this.getById(id);
+    const updated = {
+      ...existing,
+      title: data.title !== undefined ? data.title : existing.title,
+      description: data.description !== undefined ? data.description : existing.description,
+      completed: data.completed !== undefined ? data.completed : existing.completed,
+      updatedAt: new Date()
+    };
+    return await this.todoItemRepository.update(id, updated);
+  }
 
-    public TodoItem create(TodoItem item) {
-        return todoItemRepository.save(item);
-    }
-
-    public TodoItem update(Long id, TodoItem item) {
-        return todoItemRepository.findById(id)
-                .map(existing -> {
-                    existing.setTitle(item.getTitle());
-                    existing.setDescription(item.getDescription());
-                    existing.setCompleted(item.isCompleted());
-                    return todoItemRepository.save(existing);
-                })
-                .orElseThrow(() -> new RuntimeException("TodoItem not found with id " + id));
-    }
-
-    public void delete(Long id) {
-        if (!todoItemRepository.existsById(id)) {
-            throw new RuntimeException("TodoItem not found with id " + id);
-        }
-        todoItemRepository.deleteById(id);
-    }
+  async delete(id) {
+    const existing = await this.getById(id);
+    await this.todoItemRepository.delete(id);
+    return existing;
+  }
 }
+
+module.exports = TodoItemService;
